@@ -1,18 +1,23 @@
-name: Validate Windows file mappings
+name: Validate Windows section views
 
 on:
   push:
-    branches: [validation/windows-file-mapping]
+    branches: [validation/windows-section-views]
 
 permissions:
   contents: read
   statuses: write
 
-env:
-  REVISION: 4d841905531be2e9c89376ed4ce6f2faa064ca14
-
 jobs:
   native-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        revision:
+          - 3cf59cde8046b361f2afcdf03a273a6ab76a1b3e
+          - 174b83440deb6b102f33f49866b7abd40e02070c
+    env:
+      REVISION: ${{ matrix.revision }}
     runs-on: windows-2025
     timeout-minutes: 15
     defaults:
@@ -30,6 +35,7 @@ jobs:
         run: |
           cargo +nightly-2026-07-06 test -p vm-memory --no-default-features --features backend-mmap,backend-bitmap -- --list > tests.txt
           python3 - <<'PYTHON'
+          import os
           from pathlib import Path
           listing = Path("tests.txt").read_text()
           for name in (
@@ -38,6 +44,9 @@ jobs:
               "map_failed_view",
           ):
               assert "mmap::windows::tests::" + name + ": test" in listing, listing
+          if os.environ["REVISION"] == "174b83440deb6b102f33f49866b7abd40e02070c":
+              for name in ("map_section_views", "map_section_release"):
+                  assert "mmap::windows::tests::" + name + ": test" in listing, listing
           PYTHON
       - name: Run native tests
         run: cargo +nightly-2026-07-06 test -p vm-memory --no-default-features --features backend-mmap,backend-bitmap -- --show-output
